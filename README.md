@@ -36,10 +36,10 @@ Aggregate tok/s, 256 tokens per stream.
 - **Failover.** Killing a node mid-stream: the stream finished with no missing or duplicated tokens in 3 of 3 runs on the CUDA node and in 2 of 3 valid runs on the Metal node. The remaining Metal run lost part of the answer.
 - **Cache restore.** A conversation evicted from its slot resumes from host RAM in 0.063 s, against 0.98 s for a full re-prefill (4.5k-token prompt, Qwen3.6-35B).
 - **Stability.** A 30-minute soak at 4 concurrent streams completed 3,748 requests with no errors. Requests at 8k, 16k and 32k context all passed.
+- **Prefill at 32k context** (RTX 5080, Qwen3.6-35B-A3B IQ3_S, one sequence, three timed runs). Time to first token for 1.8k / 6.6k / 29k-token prompts: rc_engine 0.44 / 1.43 / 6.74 s, llama.cpp 0.47 / 1.51 / 6.94 s. An earlier version of this page reported rc_engine 1.2–1.4× slower here; that run gave rc_engine four 32k-token sequences of cache against llama.cpp's one.
 
 ## Where rc_engine is slower or lacks a feature (in progress)
 
-Both items are being worked on; this section will be updated with new measurements.
+This item is being worked on; this section will be updated with new measurements.
 
-- Prefill of the 35B model at 32k context is 1.2–1.4× slower than llama.cpp.
 - Requests that share a prompt prefix but differ at the end get no cache reuse; llama.cpp reuses them.
