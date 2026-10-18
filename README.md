@@ -36,7 +36,9 @@ Aggregate tok/s, 256 tokens per stream.
 - **Failover.** Killing a node mid-stream: the stream finished with no missing or duplicated tokens in 3 of 3 runs on the CUDA node and in 2 of 3 valid runs on the Metal node. The remaining Metal run lost part of the answer.
 - **Stability.** A 30-minute soak at 4 concurrent streams completed 3,748 requests with no errors. Requests at 8k, 16k and 32k context all passed.
 
-## Where rc_engine is slower or lacks a feature
+## Where rc_engine is slower or lacks a feature (in progress)
+
+Both items are being worked on; this section will be updated with new measurements.
 
 - Prefill of the 35B model at 32k context is 1.2–1.4× slower than llama.cpp.
 - Requests that share a prompt prefix but differ at the end get no cache reuse; llama.cpp reuses them.
