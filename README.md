@@ -2,7 +2,7 @@
 
 High-level benchmark results for **rc_engine**, a Rust inference engine (CUDA and Metal kernels) for Mixture-of-Experts language models, compared with llama.cpp. The engine's source is in a private repository, available on request.
 
-**Setup.** NVIDIA RTX 5080 16 GB (Ryzen 9 9900X, WSL2) and Apple M4 Max 64 GB. Greedy sampling, one warmup run discarded, five timed runs, median reported. Same GGUF file and context size for both engines. CUDA toolkit 13.1 (13.1.115). llama.cpp `7d56da7` on the PC, except Nemotron, which needs a newer snapshot built 2026-10-10 (0.5.0-dev, commit unknown); on the Mac, 0.5.0-dev (commit unknown). The Qwen3.6-35B-A3B results on the RTX 5080 were re-measured on 2026-11-08 with the same llama.cpp build; the other rows are from October.
+**Setup.** NVIDIA RTX 5080 16 GB (Ryzen 9 9900X, WSL2) and Apple M4 Max 64 GB; one laptop result with a GTX 1060 6 GB has its own section. Greedy sampling, one warmup run discarded, five timed runs, median reported. Same GGUF file and context size for both engines. CUDA toolkit 13.1 (13.1.115). llama.cpp `7d56da7` on the PC, except Nemotron, which needs a newer snapshot built 2026-10-10 (0.5.0-dev, commit unknown); on the Mac, 0.5.0-dev (commit unknown). The Qwen3.6-35B-A3B results on the RTX 5080 were re-measured on 2026-11-08 with the same llama.cpp build; the other rows are from October.
 
 ## Single-stream decode (tok/s)
 
@@ -55,6 +55,18 @@ One sequence, five timed runs, median. Each run uses a new copy of the image, so
 | First request, new 1280×640 PNG (823 prompt tokens) | 1.03 s | 0.53 s |
 | Follow-up question on the same image (JPEG / PNG) | 0.14 / 0.23 s | 0.22 / 0.22 s |
 | Decode in an image conversation | 210.9 tok/s | 172.8 tok/s |
+
+## A 6 GB laptop GPU (GTX 1060, Qwen3.6-35B-A3B IQ3_S)
+
+Measured 2026-11-18 on a laptop with a GTX 1060 6 GB, a Core i7-8750H and 31 GB of RAM. The 13.7 GB model file does not fit the card, so both engines keep part of the experts in system RAM. llama.cpp (0.5.0-dev, build 11205) used its best setting that fits, `-ngl 99 --n-cpu-moe 27 -fa on`; 25 or fewer did not load. One sequence, thinking off; the engines were loaded alternately, twice each, with a warmup request discarded and three timed runs per load; median of six. Times are each server's own.
+
+| | rc_engine | llama.cpp | Ratio |
+| --- | --- | --- | --- |
+| Decode, 256 generated tokens (tok/s) | 22.3 | 16.1 | 1.39× |
+| Prefill, 510-token prompt | 1.47 s (348 tok/s) | 2.12 s (241 tok/s) | 1.44× |
+| Prefill, 878-token prompt | 2.77 s (317 tok/s) | 3.71 s (237 tok/s) | 1.34× |
+
+rc_engine ran with an 8-bit KV cache and llama.cpp with its default 16-bit one; both used about 5.8–6.0 GB of the card.
 
 ## Where rc_engine is slower (in progress)
 
