@@ -20,6 +20,21 @@ High-level benchmark results for **rc_engine**, a Rust inference engine (CUDA an
 
 For Nemotron, whose 19.7 GB file does not fit the card, llama.cpp's figure is its best `--n-cpu-moe` setting.
 
+## Memory that follows the requests (RTX 5080, Qwen3.6-35B-A3B IQ3_S, 2026-11-20)
+
+rc_engine now gives the KV cache memory as each request grows, instead of reserving every slot's full context at load. The freed memory keeps more of the model on the GPU: on the 16 GB card, all 40 layers instead of 37, with four 64k-token slots and no context setting to choose. Same session; each engine loaded twice, alternately, with a warmup request discarded and three timed runs per load; median of six (four for the long prompt). llama.cpp `7d56da7`, `-ngl 99 -fa on`; NVIDIA driver 621.24. Greedy, thinking off, answers up to 512 tokens.
+
+| | rc_engine before | rc_engine now | llama.cpp `-c 8192` | llama.cpp `-c 65536` |
+| --- | --- | --- | --- | --- |
+| Layers on the GPU | 37 of 40 | 40 of 40 | all | all |
+| Decode, code answer (tok/s) | 163.3 | 208.5 | 153.2 | 151.6 |
+| Decode, prose answer (tok/s) | 166.3 | 199.7 | 152.2 | 151.5 |
+| Prefill, 879-token prompt | 0.40 s | 0.37 s | 0.30 s | 0.31 s |
+| Prefill, 20.9k-token prompt | 5.54 s | 4.38 s | — | 5.20 s |
+| Decode after the 20.9k-token prompt (tok/s) | 140.1 | 177.2 | — | 145.4 |
+
+"Before" is the previous release with its three slots of 64k, 16k and 16k tokens; "now" has four slots of 64k. llama.cpp's `-c 65536` is one 64k-token sequence. Both engines decode slower here than in the November 8 table above (216.3 and 176.6 tok/s), which used 256-token answers to a 128-token prompt and an older driver; compare within this table.
+
 ## Concurrent streams (RTX 5080, Qwen3.6-35B-A3B IQ3_S)
 
 Aggregate tok/s, 256 tokens per stream, each stream continuing a different passage of text.
@@ -68,8 +83,10 @@ Measured 2026-11-18 on a laptop with a GTX 1060 6 GB, a Core i7-8750H and 31 GB 
 
 rc_engine ran with an 8-bit KV cache and llama.cpp with its default 16-bit one; both used about 5.8–6.0 GB of the card.
 
+Re-measured 2026-11-20 with the release whose KV cache memory follows the requests (four 64k-token slots, no context setting), same method: decode 22.7 vs 15.9 tok/s (1.43×), prefill 1.50 vs 2.14 s for 511 tokens and 2.81 vs 3.72 s for 879 tokens. On this card the model's layers do not fit either way, so the change brings no speed here.
+
 ## Where rc_engine is slower (in progress)
 
 - **First request with a larger image:** about 2× slower (1.03 vs 0.53 s for a 1280×640 PNG). rc_engine's image encoder does not use tensor cores yet.
 - **A new session that repeats a long system prompt:** 0.256 vs 0.181 s (see Prompt cache).
-- **Prefill of very long prompts:** 6.67 vs 6.58 s at 29k tokens (about 1.4%).
+- **Prefill of short prompts on the RTX 5080:** 0.37 vs 0.30 s for 879 tokens (2026-11-20). From 20.9k tokens rc_engine is ahead (4.38 vs 5.20 s); the earlier 29k-token comparison had it 1.4% behind (6.67 vs 6.58 s).
