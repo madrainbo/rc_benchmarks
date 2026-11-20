@@ -35,6 +35,21 @@ rc_engine now gives the KV cache memory as each request grows, instead of reserv
 
 "Before" is the previous release with its three slots of 64k, 16k and 16k tokens; "now" has four slots of 64k. llama.cpp's `-c 65536` is one 64k-token sequence. Both engines decode slower here than in the November 8 table above (216.3 and 176.6 tok/s), which used 256-token answers to a 128-token prompt and an older driver; compare within this table.
 
+## Multi-token prediction drafts (RTX 5080, Qwen3.6-35B-A3B IQ3_S + its MTP layer, 2026-11-20)
+
+The model's own multi-token prediction (MTP) layer drafts two tokens ahead, and one pass checks them. Greedy output does not change. With the memory freed above, rc_engine keeps the MTP layer on the GPU at its normal settings (four 64k-token slots). When memory gets short, rc_engine drops the MTP layer before any model layer. It reloads it only once every layer is back on the GPU. Both engines use the same file: the release model plus the MTP layer. Same session and method as the table above: each engine loaded twice, alternately; median of six (four for the long prompt). llama.cpp `7d56da7`, `-ngl 99 -fa on -c 65536 --spec-type draft-mtp --spec-draft-n-max 2`.
+
+| | rc_engine, no drafts | rc_engine, 2 drafts | llama.cpp, 2 drafts |
+| --- | --- | --- | --- |
+| Decode, code answer (tok/s) | 200.7 | 349.2 | 232.0 |
+| Decode, prose answer (tok/s) | 200.1 | 226.3 | 175.0 |
+| Drafts accepted, code / prose | — | 0.91 / 0.55 | 0.92 / 0.56 |
+| Prefill, 879-token prompt | 0.36 s | 0.38 s | 0.63 s |
+| Prefill, 20.9k-token prompt | 4.37 s | 4.39 s | 11.45 s |
+| Decode after the 20.9k-token prompt (tok/s) | 175.8 | 171.4 | 179.9 |
+
+At 20.9k tokens of context, rc_engine has unloaded the MTP layer to make room for the growing KV cache, so it decodes without drafts. There llama.cpp, which keeps drafting, is ahead. On the 6 GB laptop below, not every layer fits on the GPU, so rc_engine never loads the MTP layer, and the new release measures the same as the previous one (decode 22.5 vs 22.6 tok/s).
+
 ## Concurrent streams (RTX 5080, Qwen3.6-35B-A3B IQ3_S)
 
 Aggregate tok/s, 256 tokens per stream, each stream continuing a different passage of text.
