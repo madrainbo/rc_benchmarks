@@ -65,7 +65,24 @@ Measured against the release before it, the one with adaptive drafts. Same file 
 | Code / prose, no drafts | 209.9 / 209.6 | 229.1 / 228.9 |
 | 4 concurrent streams, aggregate | 419.7 | 421.2 |
 
-llama.cpp was not re-run for this update; its figures in the table above are from 2026-11-20. Prompts differ from that table's, so compare the two columns with each other rather than with the table above. On the 6 GB laptop decode is unchanged (22.2 vs 22.1 tok/s).
+On the 6 GB laptop decode is unchanged (22.2 vs 22.1 tok/s).
+
+**Same session against llama.cpp, 2026-11-21 evening.** The release above, plus two fixes for long conversations:
+- the decode step's CUDA graph is recorded when the model loads. Before, the first long answer after a load recorded it mid-answer, a pause of 0.2–0.6 s;
+- when the MTP layer has to make room for a growing conversation, its memory goes straight to that conversation's KV cache. A conversation brought back from host RAM no longer waits for new GPU memory: 62–188 ms instead of 431–651 ms in an agent-like test.
+
+Same file, same method and prompts as the 2026-11-20 table above (each engine loaded twice, alternately; median of six, four for the long prompt). llama.cpp `7d56da7`, `-ngl 99 -fa on -c 65536 --spec-type draft-mtp --spec-draft-n-max 2`; NVIDIA driver 621.24.
+
+| | rc_engine, no drafts | rc_engine, 2 drafts | llama.cpp, 2 drafts |
+| --- | --- | --- | --- |
+| Decode, code answer (tok/s) | 228.6 | 413.4 | 271.7 |
+| Decode, prose answer (tok/s) | 227.1 | 301.9 | 203.1 |
+| Drafts accepted, code / prose | — | 0.89 / 0.48 | 0.91 / 0.54 |
+| Prefill, 879-token prompt | 0.37 s | 0.42 s | 0.84 s |
+| Prefill, 20.9k-token prompt | 4.26 s | 4.31 s | 10.35 s |
+| Decode after the 20.9k-token prompt (tok/s) | 192.2 | 192.1 / 253.3–272.4 | 193.3–222.1 (median 198.9) |
+
+After the 20.9k-token prompt, whether rc_engine keeps its MTP layer depends on how much video memory Windows holds at that moment. In the first load it had to unload the layer and decoded without drafts (192.1); in the second it kept the layer (253.3 and 272.4). llama.cpp also decodes faster today than in the 2026-11-20 table (code 271.7 vs 232.0), so compare within this table.
 
 ## Concurrent streams (RTX 5080, Qwen3.6-35B-A3B IQ3_S)
 
