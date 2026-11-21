@@ -50,6 +50,23 @@ The model's own multi-token prediction (MTP) layer drafts two tokens ahead, and 
 
 At 20.9k tokens of context, rc_engine has unloaded the MTP layer to make room for the growing KV cache, so it decodes without drafts. There llama.cpp, which keeps drafting, is ahead. On the 6 GB laptop below, not every layer fits on the GPU, so rc_engine never loads the MTP layer, and the new release measures the same as the previous one (decode 22.5 vs 22.6 tok/s).
 
+**Update 2026-11-21.** Two releases since the table above. The first drafts the second token only while the MTP layer is confident enough (the chance that both drafts are accepted is at least 0.3). The second speeds up decode kernels, which helps with and without drafts:
+- the experts' down projection, whose rows are short, gets one warp per row;
+- the pass that checks two or three tokens computes one output row per thread block;
+- the MTP layer scores only the 65,536 most frequent token ids when drafting. The check still uses the full vocabulary.
+
+Measured against the release before it, the one with adaptive drafts. Same file and production settings. Each release was loaded twice, alternately, with answers up to 512 tokens and a median of six. Greedy output is identical.
+
+| Decode (tok/s) | previous release | new release |
+| --- | --- | --- |
+| Code answer, drafts | 357.8 | 410.8 |
+| Prose answer, drafts | 252.9 | 287.5 |
+| Code / prose, drafts, temperature 0.7 | 306.4 / 230.4 | 353.4 / 263.9 |
+| Code / prose, no drafts | 209.9 / 209.6 | 229.1 / 228.9 |
+| 4 concurrent streams, aggregate | 419.7 | 421.2 |
+
+llama.cpp was not re-run for this update; its figures in the table above are from 2026-11-20. Prompts differ from that table's, so compare the two columns with each other rather than with the table above. On the 6 GB laptop decode is unchanged (22.2 vs 22.1 tok/s).
+
 ## Concurrent streams (RTX 5080, Qwen3.6-35B-A3B IQ3_S)
 
 Aggregate tok/s, 256 tokens per stream, each stream continuing a different passage of text.
