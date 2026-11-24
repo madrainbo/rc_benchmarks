@@ -143,7 +143,7 @@ const SECTIONS = [
       { m: "Prompt, 20.9k tokens", u: "s", v: { rc: 4.40, rc0: 4.23, llama: 10.42 } },
       { m: "Decode after the 20.9k prompt", u: "tok/s", up: true, v: { rc: 281.4, rc0: 219.8, llama: 194.2 } },
     ] },
-  { id: "m4max", tab: "M4 Max", title: "Apple M4 Max 64 GB", model: "Qwen3.6-35B-A3B IQ3_S (Ollama: its own MLX build of the model)", date: "2026-11-23",
+  { id: "m4", tab: "M4", title: "Apple M4 64 GB", model: "Qwen3.6-35B-A3B IQ3_S (Ollama: its own MLX build of the model)", date: "2026-11-23",
     series: ["rc", "llama", "ollama"], vs: "llama",
     note: "rc_engine and llama.cpp (same commit as the RTX 5080, same file) were measured in one session; Ollama 0.40.17 runs its own MLX build of the model (qwen3.6:35b-mlx), measured the same day. No drafts on any side.",
     rows: [
@@ -186,7 +186,7 @@ const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls)
 
 function heroes() {
   const h = document.getElementById("heroes");
-  const pick = [[SECTIONS[0], 0, "RTX 5080 decode"], [SECTIONS[0], 3, "RTX 5080, 20.9k-token prompt"], [SECTIONS[1], 0, "M4 Max decode"], [SECTIONS[2], 0, "6 GB laptop decode"]];
+  const pick = [[SECTIONS[0], 0, "RTX 5080 decode"], [SECTIONS[0], 3, "RTX 5080, 20.9k-token prompt"], [SECTIONS[1], 0, "M4 decode"], [SECTIONS[2], 0, "6 GB laptop decode"]];
   for (const [s, i, label] of pick) {
     const r = s.rows[i], x = ratio(r, { ours: "rc", them: s.vs });
     const d = el("div", "hero");
