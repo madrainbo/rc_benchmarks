@@ -2,6 +2,8 @@
 
 High-level benchmark results for **rc_engine**, a Rust inference engine (CUDA and Metal kernels) for Mixture-of-Experts language models, compared with llama.cpp. The engine's source is in a private repository, available on request.
 
+**Results page:** [madrainbo.github.io/rc_benchmarks](https://madrainbo.github.io/rc_benchmarks/) has the latest numbers for every machine as charts, against llama.cpp and Ollama.
+
 **Setup.** NVIDIA RTX 5080 16 GB (Ryzen 9 9900X, WSL2) and Apple M4 Max 64 GB; one laptop result with a GTX 1060 6 GB has its own section. Greedy sampling, one warmup run discarded, five timed runs, median reported. Same GGUF file and context size for both engines. CUDA toolkit 13.1 (13.1.115). llama.cpp `7d56da7` on the PC, except Nemotron, which needs a newer snapshot built 2026-10-10 (0.5.0-dev, commit unknown); on the Mac, 0.5.0-dev (commit unknown). The Qwen3.6-35B-A3B results on the RTX 5080 were re-measured on 2026-11-08 with the same llama.cpp build; the other rows are from October.
 
 ## Single-stream decode (tok/s)

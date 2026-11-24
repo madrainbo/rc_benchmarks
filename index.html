@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>rc_engine Benchmarks</title>
+<meta name="description" content="Measured speed of rc_engine against llama.cpp and Ollama on the same models and hardware.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+:root {
+  --bg: #fbfbfa; --panel: #ffffff; --line: #e6e5e0; --grid: #efeeea;
+  --fg: #1d1d1b; --fg2: #57564f; --fg3: #8a897f;
+  --rc: #2a78d6; --rc-soft: #86b6ef; --llama: #eb6834; --ollama: #1baf7a;
+  --chip: #eaf2fc; --chip-fg: #1c5cab; --warn-bg: #fdf1ea; --warn-fg: #9a3d14;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #141413; --panel: #1a1a19; --line: #2d2d2a; --grid: #252522;
+  --fg: #f0efec; --fg2: #c3c2b7; --fg3: #8f8e84;
+  --rc: #3987e5; --rc-soft: #9ec5f4; --llama: #d95926; --ollama: #199e70;
+  --chip: #16304f; --chip-fg: #9ec5f4; --warn-bg: #3a2014; --warn-fg: #f2a37f;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #141413; --panel: #1a1a19; --line: #2d2d2a; --grid: #252522;
+  --fg: #f0efec; --fg2: #c3c2b7; --fg3: #8f8e84;
+  --rc: #3987e5; --rc-soft: #9ec5f4; --llama: #d95926; --ollama: #199e70;
+  --chip: #16304f; --chip-fg: #9ec5f4; --warn-bg: #3a2014; --warn-fg: #f2a37f;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.55 "IBM Plex Sans", system-ui, sans-serif; }
+.wrap { max-width: 1040px; margin: 0 auto; padding-block: 48px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: "Space Grotesk", "IBM Plex Sans", system-ui, sans-serif; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(28px, 5vw, 40px); font-weight: 600; letter-spacing: -0.01em; }
+h2 { font-size: 22px; font-weight: 600; }
+.mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.lede { color: var(--fg2); max-width: 64ch; margin: 12px 0 0; }
+.eyebrow { font: 500 12px/1 "IBM Plex Mono", ui-monospace, monospace; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg3); }
+
+.heroes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 32px; }
+.hero { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; min-width: 0; }
+.hero .big { font: 600 34px/1.1 "Space Grotesk", system-ui, sans-serif; margin-top: 10px; }
+.hero .big small { font: 500 14px "IBM Plex Mono", monospace; color: var(--fg3); margin-left: 4px; }
+.hero .vs { color: var(--fg2); font-size: 13.5px; margin-top: 6px; }
+
+nav.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 44px 0 16px; }
+nav.tabs button { font: 500 13.5px "IBM Plex Sans", system-ui, sans-serif; color: var(--fg2); background: transparent;
+  border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; cursor: pointer; }
+nav.tabs button[aria-selected="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
+.card-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; align-items: baseline; }
+.meta { color: var(--fg3); font-size: 13px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 18px 0 6px; font-size: 13.5px; color: var(--fg2); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+.metric { display: grid; grid-template-columns: minmax(150px, 220px) 1fr; gap: 6px 20px; padding: 16px 0; border-top: 1px solid var(--grid); }
+.metric:first-of-type { border-top: 0; }
+.metric .name { font-weight: 500; min-width: 0; }
+.metric .name .hint { display: block; color: var(--fg3); font-size: 12.5px; font-weight: 400; }
+.bars { display: grid; gap: 5px; min-width: 0; }
+.bar { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; }
+.track { position: relative; height: 18px; }
+.fill { position: absolute; inset: 0 auto 0 0; border-radius: 0 4px 4px 0; min-width: 2px; transition: opacity .15s; }
+.val { font: 500 13px "IBM Plex Mono", monospace; color: var(--fg); white-space: nowrap; min-width: 9ch; text-align: right; }
+.val .who { color: var(--fg3); font-weight: 400; }
+.bar:hover .fill { opacity: .8; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ratio { justify-self: start; margin-top: 4px; font: 500 12px "IBM Plex Mono", monospace; padding: 3px 8px; border-radius: 6px; background: var(--chip); color: var(--chip-fg); }
+.ratio.behind { background: var(--warn-bg); color: var(--warn-fg); }
+.note { color: var(--fg2); font-size: 13.5px; margin: 16px 0 0; max-width: 72ch; }
+
+details.table { margin-top: 18px; }
+details.table summary { cursor: pointer; color: var(--fg2); font-size: 13.5px; }
+.scroll { overflow-x: auto; margin-top: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--fg3); font-weight: 500; }
+td { font-family: "IBM Plex Mono", monospace; }
+td:first-child { font-family: inherit; }
+
+section.block { margin-top: 48px; }
+section.block > p { color: var(--fg2); max-width: 70ch; }
+.behind-list { display: grid; gap: 10px; margin-top: 16px; }
+.behind-list div { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--llama); border-radius: 8px; padding: 12px 16px; }
+.behind-list b { font-weight: 600; }
+footer { margin-top: 56px; color: var(--fg3); font-size: 13px; border-top: 1px solid var(--line); padding-top: 20px; }
+footer p { max-width: 75ch; }
+@media (max-width: 640px) {
+  .metric { grid-template-columns: 1fr; }
+  .card { padding: 18px 16px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">rc_engine · inference benchmarks</div>
+    <h1 style="margin-top:10px">Same model, same machine, measured side by side</h1>
+    <p class="lede">rc_engine is a Rust inference engine for Mixture-of-Experts language models, running on NVIDIA GPUs and Apple Silicon. These are its measured results against llama.cpp and Ollama, with the same model file on the same hardware, and the places where it is still behind.</p>
+  </header>
+
+  <div class="heroes" id="heroes"></div>
+
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+  <div id="panel"></div>
+
+  <section class="block">
+    <h2>Other models (RTX 5080)</h2>
+    <p>Single-stream decode, 128-token prompt and 256 generated tokens, against llama.cpp with the same GGUF file. Measured in November (Nemotron in October, with a newer llama.cpp build that supports it).</p>
+    <div class="card" id="models"></div>
+  </section>
+
+  <section class="block">
+    <h2>Where rc_engine is behind</h2>
+    <div class="behind-list" id="behind"></div>
+  </section>
+
+  <footer>
+    <p><b>How these were measured.</b> Each engine loads the same GGUF file with the same context size and serves the same prompts through its own HTTP API. Greedy sampling, thinking off. The engines take turns, loaded alternately within one session; warm-up requests are discarded and the median is reported. Times are each server's own measurement. llama.cpp <span class="mono">7d56da7</span>, Ollama 0.40.17 with its MLX model. rc_engine's source is private and available on request.</p>
+    <p>Updated <span class="mono" id="updated"></span>. Older results and full tables are in the <a href="https://github.com/madrainbo/rc_benchmarks#readme" style="color:inherit">README</a>.</p>
+  </footer>
+</div>
+
+<script>
+// Every figure on this page lives here. "up": higher is better; otherwise lower is better.
+const S = { rc: { name: "rc_engine", c: "--rc" }, rc0: { name: "rc_engine, no drafts", c: "--rc-soft" },
+  llama: { name: "llama.cpp", c: "--llama" }, ollama: { name: "Ollama (MLX)", c: "--ollama" } };
+const UPDATED = "2026-11-23";
+const SECTIONS = [
+  { id: "rtx5080", tab: "RTX 5080", title: "NVIDIA RTX 5080 16 GB", model: "Qwen3.6-35B-A3B IQ3_S", date: "2026-11-22",
+    series: ["rc", "rc0", "llama"], vs: "llama",
+    note: "rc_engine and llama.cpp both draft two tokens ahead with the model's own prediction layer (llama.cpp: --spec-type draft-mtp --spec-draft-n-max 2). “No drafts” is rc_engine without it.",
+    rows: [
+      { m: "Decode, code answer", u: "tok/s", up: true, v: { rc: 424.8, rc0: 246.4, llama: 260.4 } },
+      { m: "Decode, prose answer", u: "tok/s", up: true, v: { rc: 308.5, rc0: 246.6, llama: 198.1 } },
+      { m: "Prompt, 879 tokens", u: "s", v: { rc: 0.43, rc0: 0.48, llama: 1.03 } },
+      { m: "Prompt, 20.9k tokens", u: "s", v: { rc: 4.40, rc0: 4.23, llama: 10.42 } },
+      { m: "Decode after the 20.9k prompt", u: "tok/s", up: true, v: { rc: 281.4, rc0: 219.8, llama: 194.2 } },
+    ] },
+  { id: "m4max", tab: "M4 Max", title: "Apple M4 Max 64 GB", model: "Qwen3.6-35B-A3B IQ3_S (Ollama: its own MLX build of the model)", date: "2026-11-23",
+    series: ["rc", "llama", "ollama"], vs: "llama",
+    note: "rc_engine and llama.cpp (same commit as the RTX 5080, same file) were measured in one session; Ollama 0.40.17 runs its own MLX build of the model (qwen3.6:35b-mlx), measured the same day. No drafts on any side.",
+    rows: [
+      { m: "Decode, code answer", u: "tok/s", up: true, v: { rc: 121.3, llama: 88.8, ollama: 110.4 } },
+      { m: "Decode, prose answer", u: "tok/s", up: true, v: { rc: 121.9, llama: 88.8, ollama: 109.9 } },
+      { m: "Prompt, 885 tokens", u: "s", v: { rc: 0.74, llama: 0.69, ollama: 0.49 } },
+      { m: "Prompt, 20.9k tokens", u: "s", v: { rc: 36.85, llama: 20.39, ollama: 14.48 } },
+      { m: "Decode after the 20.9k prompt", u: "tok/s", up: true, v: { rc: 81.1, llama: 76.4, ollama: 95.9 } },
+    ] },
+  { id: "gtx1060", tab: "6 GB laptop", title: "NVIDIA GTX 1060 6 GB laptop", model: "Qwen3.6-35B-A3B IQ3_S (13.7 GB: part of it in system RAM)", date: "2026-11-23",
+    series: ["rc", "llama"], vs: "llama",
+    note: "The model does not fit the card, so both engines keep part of it in system RAM. llama.cpp used its best setting that fits (-ngl 99 --n-cpu-moe 27). Same llama.cpp commit as the other machines.",
+    rows: [
+      { m: "Decode", u: "tok/s", up: true, v: { rc: 22.3, llama: 15.6 } },
+      { m: "Prompt, 510 tokens", u: "s", v: { rc: 1.50, llama: 2.15 } },
+      { m: "Prompt, 879 tokens", u: "s", v: { rc: 2.81, llama: 3.78 } },
+    ] },
+  { id: "streams", tab: "Concurrent streams", title: "Concurrent streams, RTX 5080", model: "Qwen3.6-35B-A3B IQ3_S · aggregate tok/s, 256 tokens per stream", date: "2026-11",
+    series: ["rc", "llama"], vs: "llama",
+    rows: [
+      { m: "1 stream", u: "tok/s", up: true, v: { rc: 200.3, llama: 160.9 } },
+      { m: "4 streams", u: "tok/s", up: true, v: { rc: 510.8, llama: 358.1 } },
+      { m: "12 streams", u: "tok/s", up: true, v: { rc: 479.4, llama: 291.4 } },
+    ] },
+];
+const MODELS = [
+  ["LFM2.5-8B-A1B Q4_K_M", 545.0, 444.0], ["Qwen3.6-35B-A3B IQ3_S", 216.3, 176.6], ["Qwen3.6-14B-A3B Q6_K", 204.4, 176.4],
+  ["GLM-4.7-Flash Q3_K_XL", 202.7, 182.5], ["Nemotron-3.5-30B IQ3_XXS", 151.0, 112.6],
+];
+const BEHIND = [
+  ["Long prompts on the Mac", "A 20.9k-token prompt takes 36.9 s against llama.cpp's 20.4 s and Ollama's 14.5 s; decode right after it trails Ollama (81 vs 96 tok/s)."],
+  ["Short prompts on the Mac", "885 tokens in 0.74 s against llama.cpp's 0.69 s and Ollama's 0.49 s."],
+  ["Larger images", "The first request with a 1280×640 image takes 1.03 s against llama.cpp's 0.53 s."],
+  ["A new session repeating a long system prompt", "0.256 s against llama.cpp's 0.181 s."],
+];
+
+const fmt = (x, u) => u === "s" ? x.toFixed(2) + " s" : x.toFixed(1) + " tok/s";
+const ratio = (r, vs) => { const a = r.v[vs.ours], b = r.v[vs.them]; return r.up ? a / b : b / a; };
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+
+function heroes() {
+  const h = document.getElementById("heroes");
+  const pick = [[SECTIONS[0], 0, "RTX 5080 decode"], [SECTIONS[0], 3, "RTX 5080, 20.9k-token prompt"], [SECTIONS[1], 0, "M4 Max decode"], [SECTIONS[2], 0, "6 GB laptop decode"]];
+  for (const [s, i, label] of pick) {
+    const r = s.rows[i], x = ratio(r, { ours: "rc", them: s.vs });
+    const d = el("div", "hero");
+    d.append(el("div", "eyebrow", label));
+    d.append(el("div", "big", `${x.toFixed(2)}×<small>faster</small>`));
+    d.append(el("div", "vs", `${fmt(r.v.rc, r.u)} vs ${S[s.vs].name} ${fmt(r.v[s.vs], r.u)}`));
+    h.append(d);
+  }
+}
+
+function render(id) {
+  const s = SECTIONS.find(x => x.id === id) || SECTIONS[0];
+  document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.id === s.id));
+  const p = document.getElementById("panel"); p.innerHTML = "";
+  const card = el("div", "card");
+  const head = el("div", "card-head");
+  head.append(el("h2", "", s.title), el("div", "meta mono", s.date));
+  card.append(head, el("div", "meta", s.model));
+  const lg = el("div", "legend");
+  s.series.forEach(k => lg.append(el("span", "", `<i style="background:var(${S[k].c})"></i>${S[k].name}`)));
+  card.append(lg);
+  for (const r of s.rows) {
+    const row = el("div", "metric");
+    row.append(el("div", "name", `${r.m}<span class="hint">${r.up ? "higher is better" : "lower is better"}</span>`));
+    const bars = el("div", "bars");
+    const max = Math.max(...s.series.map(k => r.v[k]));
+    for (const k of s.series) {
+      const b = el("div", "bar"); b.title = `${S[k].name}: ${fmt(r.v[k], r.u)}`;
+      const t = el("div", "track"); const f = el("div", "fill");
+      f.style.width = (100 * r.v[k] / max) + "%"; f.style.background = `var(${S[k].c})`;
+      t.append(f); b.append(t, el("div", "val", fmt(r.v[k], r.u)));
+      bars.append(b);
+    }
+    const chips = el("div", "chips");
+    for (const k of s.series.filter(k => k !== "rc" && k !== "rc0")) {
+      const x = ratio(r, { ours: "rc", them: k });
+      chips.append(el("div", "ratio" + (x < 1 ? " behind" : ""), x >= 1 ? `${x.toFixed(2)}× vs ${S[k].name}` : `${S[k].name} ${(1 / x).toFixed(2)}× faster`));
+    }
+    bars.append(chips);
+    row.append(bars); card.append(row);
+  }
+  if (s.note) card.append(el("p", "note", s.note));
+  const det = el("details", "table"); det.append(el("summary", "", "Show as a table"));
+  const tbl = `<table><thead><tr><th></th>${s.series.map(k => `<th>${S[k].name}</th>`).join("")}</tr></thead><tbody>` +
+    s.rows.map(r => `<tr><td>${r.m}</td>${s.series.map(k => `<td>${fmt(r.v[k], r.u)}</td>`).join("")}</tr>`).join("") + "</tbody></table>";
+  const sc = el("div", "scroll", tbl); det.append(sc); card.append(det);
+  p.append(card);
+}
+
+function models() {
+  const c = document.getElementById("models");
+  const lg = el("div", "legend"); lg.style.marginTop = "0";
+  ["rc", "llama"].forEach(k => lg.append(el("span", "", `<i style="background:var(${S[k].c})"></i>${S[k].name}`)));
+  c.append(lg);
+  const max = Math.max(...MODELS.map(m => m[1]));
+  for (const [name, a, b] of MODELS) {
+    const row = el("div", "metric"); row.append(el("div", "name", name));
+    const bars = el("div", "bars");
+    [["rc", a], ["llama", b]].forEach(([k, v]) => {
+      const bar = el("div", "bar"); bar.title = `${S[k].name}: ${v.toFixed(1)} tok/s`;
+      const t = el("div", "track"), f = el("div", "fill");
+      f.style.width = (100 * v / max) + "%"; f.style.background = `var(${S[k].c})`;
+      t.append(f); bar.append(t, el("div", "val", v.toFixed(1) + " tok/s")); bars.append(bar);
+    });
+    bars.append(el("div", "ratio", `rc_engine ${(a / b).toFixed(2)}× faster`));
+    row.append(bars); c.append(row);
+  }
+}
+
+const tabs = document.getElementById("tabs");
+for (const s of SECTIONS) {
+  const b = el("button", "", s.tab); b.dataset.id = s.id; b.setAttribute("role", "tab");
+  b.onclick = () => { history.replaceState(null, "", "#" + s.id); render(s.id); };
+  tabs.append(b);
+}
+document.getElementById("behind").append(...BEHIND.map(([t, d]) => el("div", "", `<b>${t}.</b> ${d}`)));
+document.getElementById("updated").textContent = UPDATED;
+heroes(); models();
+render(location.hash.slice(1));
+window.addEventListener("hashchange", () => render(location.hash.slice(1)));
+</script>
+</body>
+</html>
